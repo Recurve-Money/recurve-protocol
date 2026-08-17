@@ -17,13 +17,13 @@ contract Deploy is Script {
         address deployer = vm.addr(pk);
 
         IERC20 asset = IERC20(vm.envAddress("VAULT_ASSET"));
-        IERC20 arc = IERC20(vm.envAddress("ARC_TOKEN"));
+        IERC20 reve = IERC20(vm.envAddress("REVE_TOKEN"));
         address agent = vm.envAddress("AGENT");
         address treasury = vm.envAddress("TREASURY");
 
         vm.startBroadcast(pk);
 
-        GuardianRegistry registry = new GuardianRegistry(arc, 1_000e18, 7 days, deployer);
+        GuardianRegistry registry = new GuardianRegistry(reve, 1_000e18, 7 days, deployer);
 
         address predicted = vm.computeCreateAddress(deployer, vm.getNonce(deployer) + 1);
         RecurveVault vault = new RecurveVault(asset, "Recurve Fund", "rvFUND", predicted);

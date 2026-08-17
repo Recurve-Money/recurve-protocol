@@ -16,8 +16,8 @@ contract MockUSD is ERC20 {
     }
 }
 
-contract MockArc is ERC20 {
-    constructor() ERC20("Recurve", "ARC") {}
+contract MockReve is ERC20 {
+    constructor() ERC20("Recurve", "REVE") {}
 
     function mint(address to, uint256 amount) external {
         _mint(to, amount);
@@ -40,7 +40,7 @@ contract MockStrategy {
 
 contract RecurveProtocolTest is Test {
     MockUSD internal usd;
-    MockArc internal arc;
+    MockReve internal reve;
     RecurveVault internal vault;
     RecurveGovernor internal governor;
     GuardianRegistry internal registry;
@@ -64,9 +64,9 @@ contract RecurveProtocolTest is Test {
 
     function setUp() public {
         usd = new MockUSD();
-        arc = new MockArc();
+        reve = new MockReve();
 
-        registry = new GuardianRegistry(IERC20(address(arc)), MIN_STAKE, UNSTAKE_DELAY, admin);
+        registry = new GuardianRegistry(IERC20(address(reve)), MIN_STAKE, UNSTAKE_DELAY, admin);
 
         // The vault and governor reference each other, so precompute the governor
         // address and deploy in a fixed order.
@@ -94,8 +94,8 @@ contract RecurveProtocolTest is Test {
         usd.mint(bob, 1_000_000e18);
         usd.mint(carol, 1_000_000e18);
         usd.mint(agent, 1_000_000e18);
-        arc.mint(guardian1, 100_000e18);
-        arc.mint(guardian2, 100_000e18);
+        reve.mint(guardian1, 100_000e18);
+        reve.mint(guardian2, 100_000e18);
 
         // The agent pays the performance fee out of its own balance on settle.
         vm.prank(agent);
@@ -117,7 +117,7 @@ contract RecurveProtocolTest is Test {
 
     function _stakeGuardian(address who, uint256 amount) internal {
         vm.startPrank(who);
-        arc.approve(address(registry), amount);
+        reve.approve(address(registry), amount);
         registry.stake(amount);
         vm.stopPrank();
     }
@@ -450,14 +450,14 @@ contract RecurveProtocolTest is Test {
         vm.prank(guardian2);
         registry.castVerdict(id, GuardianRegistry.Verdict.Block);
 
-        uint256 blockerBefore = arc.balanceOf(guardian2);
+        uint256 blockerBefore = reve.balanceOf(guardian2);
 
         vm.prank(address(governor));
         registry.convict(id);
 
         // Nobody profits from a conviction — otherwise convicting becomes an attack.
-        assertEq(arc.balanceOf(guardian2), blockerBefore);
-        assertEq(arc.balanceOf(address(0xdead)), MIN_STAKE);
+        assertEq(reve.balanceOf(guardian2), blockerBefore);
+        assertEq(reve.balanceOf(address(0xdead)), MIN_STAKE);
     }
 
     function test_convict_cannotReplay() public {
@@ -521,7 +521,7 @@ contract RecurveProtocolTest is Test {
         vm.prank(guardian1);
         registry.unstake();
 
-        assertEq(arc.balanceOf(guardian1), 100_000e18 - MIN_STAKE, "nothing should come back");
+        assertEq(reve.balanceOf(guardian1), 100_000e18 - MIN_STAKE, "nothing should come back");
     }
 
     // ---------------------------------------------------------------- fees

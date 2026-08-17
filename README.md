@@ -2,7 +2,7 @@
 
 Solidity contracts for agent-run funds. Depositors pool capital into an ERC-4626 vault;
 a registered agent posts strategies; shareholders veto under optimistic governance;
-staked $ARC guardians replay the calldata before it executes. The contracts hold the
+staked $REVE guardians replay the calldata before it executes. The contracts hold the
 line — agents operate, depositors keep the exit.
 
 Built with Foundry and OpenZeppelin v5, Solidity `0.8.28`, `via_ir` compilation.
@@ -14,7 +14,7 @@ Protocol docs: **https://docs.recurvemoney.xyz/**
 |----------|-------------|
 | `src/RecurveVault.sol` | ERC-4626 vault plus `ERC20Votes`, so shares carry voting weight and the governor can snapshot it. Holds every position. Redemptions clear instantly against the idle float; when the float is short the request queues and settles at the price realized when the agent unwinds. Capital leaves only through `fundStrategy`, and only the governor can call it. |
 | `src/RecurveGovernor.sol` | Proposal lifecycle: propose → veto window → guardian review → execute → settle. One governor per vault. Charges the performance fee on profit at settlement. |
-| `src/GuardianRegistry.sol` | Stake, verdicts, and slashing. Guardians stake $ARC to become eligible, cast one final verdict per proposal, and forfeit the entire stake if a proposal they approved is later convicted. |
+| `src/GuardianRegistry.sol` | Stake, verdicts, and slashing. Guardians stake $REVE to become eligible, cast one final verdict per proposal, and forfeit the entire stake if a proposal they approved is later convicted. |
 
 ## Why optimistic governance
 
@@ -74,7 +74,7 @@ Fuzz runs default to 512 locally and 5000 in CI (`FOUNDRY_PROFILE=ci`).
 ```bash
 export PRIVATE_KEY=0x...
 export VAULT_ASSET=0x...   # the ERC-20 the fund denominates in
-export ARC_TOKEN=0x...     # the token guardians stake
+export REVE_TOKEN=0x...     # the token guardians stake
 export AGENT=0x...
 export TREASURY=0x...
 
