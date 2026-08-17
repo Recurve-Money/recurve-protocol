@@ -6,5 +6,3 @@ broadcast/*/dry-run/
 docs/book/
 lcov.info
 
-# Foundry deps are vendored, not submoduled
-lib/**/.git
