@@ -1,0 +1,23 @@
+{
+  "chainId": 4663,
+  "name": "Robinhood Chain",
+  "rpc": "https://rpc.mainnet.chain.robinhood.com",
+  "tokens": {
+    "WETH": "0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73",
+    "USDG": "0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168"
+  },
+  "external": {
+    "UniswapV3Factory": "0x1f7d7550B1b028f7571E69A784071F0205FD2EfA",
+    "UniswapV3NonfungiblePositionManager": "0x73991a25c818bf1f1128deaab1492d45638de0d3",
+    "MorphoBlue": "0x9D53d5E3bd5E8d4Cbfa6DB1ca238AEA02E651010"
+  },
+  "_warning": [
+    "The canonical Uniswap V3 mainnet addresses are NOT the deployment on this chain.",
+    "0x1F98431c8aD98523631AE4a59f267346ea31F984 and",
+    "0xC36442b4a4522E871399CD717aBDD847Ab11FE88 each hold unrelated code here.",
+    "A code.length != 0 guard passes on both, so deploy-time checks must assert",
+    "identity: call feeAmountTickSpacing on the factory and check the pool it",
+    "returns reports the same factory back."
+  ],
+  "_source": "Addresses taken from a public repository. Verify each one on chain before deploying against it; none of these have been confirmed independently."
+}
