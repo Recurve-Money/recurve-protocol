@@ -27,8 +27,18 @@ contract RecurveGovernor is ReentrancyGuard {
     /// @notice Guardian network that reviews calldata before execution.
     GuardianRegistry public immutable guardians;
 
-    /// @notice The agent allowed to propose.
-    address public agent;
+    /// @notice Agents allowed to propose on this vault.
+    /// @dev A set rather than a single address. A fund often wants a signal
+    ///      agent, an execution agent, and a fallback, and forcing them to
+    ///      share one key means a compromise of any of them is a compromise of
+    ///      all. Adding and removing is governance-gated.
+    mapping(address => bool) public isAgent;
+
+    /// @notice Registered agents, for enumeration off chain.
+    address[] public agents;
+
+    /// @notice Address allowed to change the agent set.
+    address public agentAdmin;
 
     /// @notice How long depositors have to veto after a proposal is posted.
     uint256 public vetoWindow;
@@ -76,9 +86,14 @@ contract RecurveGovernor is ReentrancyGuard {
     event ProposalBlocked(bytes32 indexed proposalId, uint256 blocks_);
     event ProposalExecuted(bytes32 indexed proposalId, address indexed target, uint256 assets);
     event ProposalSettled(bytes32 indexed proposalId, uint256 returned, uint256 fee);
-    event AgentUpdated(address indexed agent);
+    event AgentAdded(address indexed agent);
+    event AgentRemoved(address indexed agent);
+    event AgentAdminUpdated(address indexed admin);
 
     error OnlyAgent();
+    error OnlyAgentAdmin();
+    error AlreadyAgent();
+    error NotAnAgent();
     error UnknownProposal();
     error WrongState();
     error VetoWindowOpen();
@@ -90,7 +105,12 @@ contract RecurveGovernor is ReentrancyGuard {
     error FeeTooHigh();
 
     modifier onlyAgent() {
-        if (msg.sender != agent) revert OnlyAgent();
+        if (!isAgent[msg.sender]) revert OnlyAgent();
+        _;
+    }
+
+    modifier onlyAgentAdmin() {
+        if (msg.sender != agentAdmin) revert OnlyAgentAdmin();
         _;
     }
 
@@ -108,7 +128,9 @@ contract RecurveGovernor is ReentrancyGuard {
 
         vault = vault_;
         guardians = guardians_;
-        agent = agent_;
+        agentAdmin = agent_;
+        isAgent[agent_] = true;
+        agents.push(agent_);
         vetoWindow = vetoWindow_;
         vetoThresholdBps = vetoThresholdBps_;
         guardianBlockThreshold = guardianBlockThreshold_;
@@ -235,5 +257,47 @@ contract RecurveGovernor is ReentrancyGuard {
 
     function executableAt(bytes32 proposalId) external view returns (uint256) {
         return proposals[proposalId].postedAt + vetoWindow;
+    }
+
+    /// @notice Registered agents.
+    function allAgents() external view returns (address[] memory) {
+        return agents;
+    }
+
+    function agentCount() external view returns (uint256) {
+        return agents.length;
+    }
+
+    // ---------------------------------------------------------------- agents
+
+    function addAgent(address agent_) external onlyAgentAdmin {
+        if (isAgent[agent_]) revert AlreadyAgent();
+        isAgent[agent_] = true;
+        agents.push(agent_);
+        emit AgentAdded(agent_);
+    }
+
+    /// @notice Revoke an agent.
+    /// @dev Proposals it already posted stay live. Removing an agent is not a
+    ///      way to cancel its pending work, and pretending otherwise would give
+    ///      the admin a silent veto that bypasses the depositor vote.
+    function removeAgent(address agent_) external onlyAgentAdmin {
+        if (!isAgent[agent_]) revert NotAnAgent();
+        isAgent[agent_] = false;
+
+        for (uint256 i; i < agents.length; ++i) {
+            if (agents[i] == agent_) {
+                agents[i] = agents[agents.length - 1];
+                agents.pop();
+                break;
+            }
+        }
+
+        emit AgentRemoved(agent_);
+    }
+
+    function setAgentAdmin(address admin) external onlyAgentAdmin {
+        agentAdmin = admin;
+        emit AgentAdminUpdated(admin);
     }
 }
