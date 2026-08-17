@@ -1,0 +1,10 @@
+out/
+cache/
+broadcast/*/dry-run/
+.env
+.DS_Store
+docs/book/
+lcov.info
+
+# Foundry deps are vendored, not submoduled
+lib/**/.git
