@@ -6,14 +6,14 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {IVotes} from "@openzeppelin/contracts/governance/utils/IVotes.sol";
 import {RecurveVault} from "./RecurveVault.sol";
-import {GuardianRegistry} from "./GuardianRegistry.sol";
+import {WatcherRegistry} from "./WatcherRegistry.sol";
 
 /// @title RecurveGovernor
-/// @notice Proposal lifecycle for a single vault: propose, veto window, guardian
+/// @notice Proposal lifecycle for a single vault: propose, veto window, watcher
 ///         review, execute, settle.
 /// @dev Governance here is optimistic. A proposal passes unless depositors vote it
 ///      down inside the window, because an agent that has to wait for a quorum to
-///      say yes cannot trade. The safety comes from the veto plus guardian review,
+///      say yes cannot trade. The safety comes from the veto plus watcher review,
 ///      not from an approval gate.
 ///
 ///      One governor per vault. Sharing a governor across vaults would let a large
@@ -24,8 +24,8 @@ contract RecurveGovernor is ReentrancyGuard {
     /// @notice The vault this governor controls.
     RecurveVault public immutable vault;
 
-    /// @notice Guardian network that reviews calldata before execution.
-    GuardianRegistry public immutable guardians;
+    /// @notice Watcher network that reviews calldata before execution.
+    WatcherRegistry public immutable watchers;
 
     /// @notice Agents allowed to propose on this vault.
     /// @dev A set rather than a single address. A fund often wants a signal
@@ -46,8 +46,8 @@ contract RecurveGovernor is ReentrancyGuard {
     /// @notice Share of vote weight that must veto to kill a proposal, in basis points.
     uint256 public vetoThresholdBps;
 
-    /// @notice Blocks from guardians required to stop execution.
-    uint256 public guardianBlockThreshold;
+    /// @notice Blocks from watchers required to stop execution.
+    uint256 public watcherBlockThreshold;
 
     /// @notice Performance fee on profit, in basis points. Never charged on principal.
     uint256 public performanceFeeBps;
@@ -100,7 +100,7 @@ contract RecurveGovernor is ReentrancyGuard {
     error VetoWindowClosed();
     error AlreadyVetoed();
     error NoVotingWeight();
-    error GuardiansBlocked();
+    error WatchersBlocked();
     error ExecutionFailed();
     error FeeTooHigh();
 
@@ -116,24 +116,24 @@ contract RecurveGovernor is ReentrancyGuard {
 
     constructor(
         RecurveVault vault_,
-        GuardianRegistry guardians_,
+        WatcherRegistry watchers_,
         address agent_,
         uint256 vetoWindow_,
         uint256 vetoThresholdBps_,
-        uint256 guardianBlockThreshold_,
+        uint256 watcherBlockThreshold_,
         uint256 performanceFeeBps_,
         address feeRecipient_
     ) {
         if (performanceFeeBps_ > 1500) revert FeeTooHigh();
 
         vault = vault_;
-        guardians = guardians_;
+        watchers = watchers_;
         agentAdmin = agent_;
         isAgent[agent_] = true;
         agents.push(agent_);
         vetoWindow = vetoWindow_;
         vetoThresholdBps = vetoThresholdBps_;
-        guardianBlockThreshold = guardianBlockThreshold_;
+        watcherBlockThreshold = watcherBlockThreshold_;
         performanceFeeBps = performanceFeeBps_;
         feeRecipient = feeRecipient_;
     }
@@ -141,7 +141,7 @@ contract RecurveGovernor is ReentrancyGuard {
     // ---------------------------------------------------------------- propose
 
     /// @notice Post a strategy for review. Calldata is committed here, in full, before
-    ///         anyone decides — what guardians simulate is what will run.
+    ///         anyone decides — what watchers simulate is what will run.
     function propose(address target, uint256 assets, bytes calldata callData)
         external
         onlyAgent
@@ -193,18 +193,18 @@ contract RecurveGovernor is ReentrancyGuard {
 
     // ---------------------------------------------------------------- execute
 
-    /// @notice Execute a proposal that survived the veto window and guardian review.
+    /// @notice Execute a proposal that survived the veto window and watcher review.
     function execute(bytes32 proposalId) external onlyAgent nonReentrant {
         Proposal storage p = proposals[proposalId];
         if (p.state == State.None) revert UnknownProposal();
         if (p.state != State.Pending) revert WrongState();
         if (block.timestamp < p.postedAt + vetoWindow) revert VetoWindowOpen();
 
-        uint256 blocks_ = guardians.blockCount(proposalId);
-        if (blocks_ >= guardianBlockThreshold) {
+        uint256 blocks_ = watchers.blockCount(proposalId);
+        if (blocks_ >= watcherBlockThreshold) {
             p.state = State.Blocked;
             emit ProposalBlocked(proposalId, blocks_);
-            revert GuardiansBlocked();
+            revert WatchersBlocked();
         }
 
         p.state = State.Executed;

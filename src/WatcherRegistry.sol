@@ -6,26 +6,26 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
-/// @title GuardianRegistry
-/// @notice Stake, verdicts, and slashing for the guardian network.
-/// @dev The asymmetry is the whole mechanism: blocking a proposal costs a guardian
+/// @title WatcherRegistry
+/// @notice Stake, verdicts, and slashing for the watcher network.
+/// @dev The asymmetry is the whole mechanism: blocking a proposal costs a watcher
 ///      nothing but that round's reward, while approving calldata that later gets
 ///      convicted burns their stake. Being careful is cheap; being negligent is not.
 ///
 ///      Burned stake is sent to address(0) rather than redistributed. If slashed stake
-///      paid out to other guardians, a majority could profit by convicting a minority,
+///      paid out to other watchers, a majority could profit by convicting a minority,
 ///      and the incentive to review honestly would invert.
-contract GuardianRegistry is Ownable, ReentrancyGuard {
+contract WatcherRegistry is Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
-    /// @notice The token guardians stake.
+    /// @notice The token watchers stake.
     IERC20 public immutable stakeToken;
 
     /// @notice Minimum stake required to cast a verdict.
     uint256 public minStake;
 
     /// @notice Delay between requesting an unstake and being able to withdraw.
-    /// @dev Long enough that a guardian cannot approve a malicious call and exit
+    /// @dev Long enough that a watcher cannot approve a malicious call and exit
     ///      before the conviction window closes.
     uint256 public unstakeDelay;
 
@@ -38,22 +38,22 @@ contract GuardianRegistry is Ownable, ReentrancyGuard {
         Block
     }
 
-    struct Guardian {
+    struct Watcher {
         uint256 stake;
         uint256 unstakeRequestedAt;
         uint256 pendingUnstake;
         bool active;
     }
 
-    mapping(address => Guardian) public guardians;
+    mapping(address => Watcher) public watchers;
 
-    /// @notice Verdict cast by a guardian on a given proposal.
+    /// @notice Verdict cast by a watcher on a given proposal.
     mapping(bytes32 => mapping(address => Verdict)) public verdicts;
 
-    /// @notice Guardians who approved a proposal, for reward and slashing lookup.
+    /// @notice Watchers who approved a proposal, for reward and slashing lookup.
     mapping(bytes32 => address[]) public approvers;
 
-    /// @notice Guardians who blocked a proposal.
+    /// @notice Watchers who blocked a proposal.
     mapping(bytes32 => address[]) public blockers;
 
     /// @notice Proposals already convicted, so a conviction cannot be replayed.
@@ -62,11 +62,11 @@ contract GuardianRegistry is Ownable, ReentrancyGuard {
     uint256 public totalStaked;
     uint256 public totalBurned;
 
-    event Staked(address indexed guardian, uint256 amount, uint256 newStake);
-    event UnstakeRequested(address indexed guardian, uint256 amount, uint256 claimableAt);
-    event Unstaked(address indexed guardian, uint256 amount);
-    event VerdictCast(bytes32 indexed proposalId, address indexed guardian, Verdict verdict);
-    event Convicted(bytes32 indexed proposalId, uint256 guardiansSlashed, uint256 stakeBurned);
+    event Staked(address indexed watcher, uint256 amount, uint256 newStake);
+    event UnstakeRequested(address indexed watcher, uint256 amount, uint256 claimableAt);
+    event Unstaked(address indexed watcher, uint256 amount);
+    event VerdictCast(bytes32 indexed proposalId, address indexed watcher, Verdict verdict);
+    event Convicted(bytes32 indexed proposalId, uint256 watchersSlashed, uint256 stakeBurned);
     event GovernorUpdated(address indexed governor);
     event ParametersUpdated(uint256 minStake, uint256 unstakeDelay);
 
@@ -100,7 +100,7 @@ contract GuardianRegistry is Ownable, ReentrancyGuard {
 
         stakeToken.safeTransferFrom(msg.sender, address(this), amount);
 
-        Guardian storage g = guardians[msg.sender];
+        Watcher storage g = watchers[msg.sender];
         g.stake += amount;
         g.active = g.stake >= minStake;
         totalStaked += amount;
@@ -110,7 +110,7 @@ contract GuardianRegistry is Ownable, ReentrancyGuard {
 
     /// @notice Start the exit clock. Stake stays slashable until it is withdrawn.
     function requestUnstake(uint256 amount) external {
-        Guardian storage g = guardians[msg.sender];
+        Watcher storage g = watchers[msg.sender];
         if (g.stake == 0) revert NothingStaked();
         if (amount == 0 || amount > g.stake) revert ZeroAmount();
 
@@ -122,7 +122,7 @@ contract GuardianRegistry is Ownable, ReentrancyGuard {
 
     /// @notice Withdraw once the delay has passed.
     function unstake() external nonReentrant {
-        Guardian storage g = guardians[msg.sender];
+        Watcher storage g = watchers[msg.sender];
         uint256 amount = g.pendingUnstake;
         if (amount == 0) revert NoPendingUnstake();
         if (block.timestamp < g.unstakeRequestedAt + unstakeDelay) revert UnstakeNotReady();
@@ -143,10 +143,10 @@ contract GuardianRegistry is Ownable, ReentrancyGuard {
     // ---------------------------------------------------------------- verdicts
 
     /// @notice Record a verdict on a proposal.
-    /// @dev Called by the guardian, gated on active stake. One verdict per proposal;
+    /// @dev Called by the watcher, gated on active stake. One verdict per proposal;
     ///      there is no changing your mind once your stake is behind a call.
     function castVerdict(bytes32 proposalId, Verdict verdict) external {
-        Guardian storage g = guardians[msg.sender];
+        Watcher storage g = watchers[msg.sender];
         if (!g.active || g.stake < minStake) revert BelowMinStake();
         if (verdicts[proposalId][msg.sender] != Verdict.None) revert AlreadyVoted();
 
@@ -163,7 +163,7 @@ contract GuardianRegistry is Ownable, ReentrancyGuard {
 
     /// @notice Slash and burn the stake of everyone who approved a malicious proposal.
     /// @dev Iterating approvers is bounded in practice by `minStake` — the registry is
-    ///      not designed for an unbounded guardian set, and a conviction that ran out
+    ///      not designed for an unbounded watcher set, and a conviction that ran out
     ///      of gas would be worse than a cap.
     function convict(bytes32 proposalId) external onlyGovernor {
         if (convicted[proposalId]) revert AlreadyConvicted();
@@ -173,7 +173,7 @@ contract GuardianRegistry is Ownable, ReentrancyGuard {
         uint256 burned;
 
         for (uint256 i; i < list.length; ++i) {
-            Guardian storage g = guardians[list[i]];
+            Watcher storage g = watchers[list[i]];
             uint256 amount = g.stake;
             if (amount == 0) continue;
 
@@ -194,8 +194,8 @@ contract GuardianRegistry is Ownable, ReentrancyGuard {
 
     // ---------------------------------------------------------------- views
 
-    function isActive(address guardian) external view returns (bool) {
-        Guardian storage g = guardians[guardian];
+    function isActive(address watcher) external view returns (bool) {
+        Watcher storage g = watchers[watcher];
         return g.active && g.stake >= minStake;
     }
 

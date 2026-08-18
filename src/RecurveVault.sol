@@ -91,7 +91,7 @@ contract RecurveVault is ERC4626, ERC20Votes, ERC20Permit, ReentrancyGuard {
     // ---------------------------------------------------------------- strategy
 
     /// @notice Move assets out to a strategy target. Governor-only, and only ever
-    ///         called after a proposal has cleared both the vote and guardian review.
+    ///         called after a proposal has cleared both the vote and watcher review.
     function fundStrategy(address target, uint256 assets) external onlyGovernor nonReentrant {
         if (assets > float()) revert FloatTooLow();
         deployedAssets += assets;

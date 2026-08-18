@@ -7,7 +7,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ISwapRouter, PortfolioStrategy} from "../src/strategies/PortfolioStrategy.sol";
 import {RecurveVault} from "../src/RecurveVault.sol";
 import {RecurveGovernor} from "../src/RecurveGovernor.sol";
-import {GuardianRegistry} from "../src/GuardianRegistry.sol";
+import {WatcherRegistry} from "../src/WatcherRegistry.sol";
 
 contract Token is ERC20 {
     constructor(string memory n, string memory s) ERC20(n, s) {}
@@ -48,7 +48,7 @@ contract PortfolioStrategyTest is Test {
 
     RecurveVault internal vault;
     RecurveGovernor internal governor;
-    GuardianRegistry internal registry;
+    WatcherRegistry internal registry;
     Token internal reve;
 
     address internal agent = makeAddr("agent");
@@ -64,7 +64,7 @@ contract PortfolioStrategyTest is Test {
         reve = new Token("Recurve", "REVE");
         router = new MockRouter();
 
-        registry = new GuardianRegistry(IERC20(address(reve)), 1_000e18, 7 days, admin);
+        registry = new WatcherRegistry(IERC20(address(reve)), 1_000e18, 7 days, admin);
 
         address predicted = vm.computeCreateAddress(address(this), vm.getNonce(address(this)) + 1);
         vault = new RecurveVault(IERC20(address(usd)), "Fund", "rvF", predicted);

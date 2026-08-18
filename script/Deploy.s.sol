@@ -5,7 +5,7 @@ import {Script, console} from "forge-std/Script.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {RecurveVault} from "../src/RecurveVault.sol";
 import {RecurveGovernor} from "../src/RecurveGovernor.sol";
-import {GuardianRegistry} from "../src/GuardianRegistry.sol";
+import {WatcherRegistry} from "../src/WatcherRegistry.sol";
 
 /// @notice Deploys a registry plus one vault/governor pair.
 /// @dev The vault and governor reference each other, so the governor address is
@@ -23,7 +23,7 @@ contract Deploy is Script {
 
         vm.startBroadcast(pk);
 
-        GuardianRegistry registry = new GuardianRegistry(reve, 1_000e18, 7 days, deployer);
+        WatcherRegistry registry = new WatcherRegistry(reve, 1_000e18, 7 days, deployer);
 
         address predicted = vm.computeCreateAddress(deployer, vm.getNonce(deployer) + 1);
         RecurveVault vault = new RecurveVault(asset, "Recurve Fund", "rvFUND", predicted);
@@ -33,7 +33,7 @@ contract Deploy is Script {
             agent,
             6 hours, // veto window
             3000, // 30% of supply vetoes
-            2, // guardian blocks needed to stop execution
+            2, // watcher blocks needed to stop execution
             1500, // 15% performance fee on profit
             treasury
         );
@@ -43,7 +43,7 @@ contract Deploy is Script {
 
         vm.stopBroadcast();
 
-        console.log("GuardianRegistry", address(registry));
+        console.log("WatcherRegistry", address(registry));
         console.log("RecurveVault    ", address(vault));
         console.log("RecurveGovernor ", address(governor));
     }

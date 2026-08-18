@@ -32,7 +32,7 @@ interface ISwapRouter {
 /// @dev This exists to close the gap between what the docs promise and what the
 ///      governor can enforce. `RecurveGovernor.execute` forwards arbitrary
 ///      calldata to an arbitrary target, which means the only thing standing
-///      between an agent and a drained vault is the veto plus guardian review.
+///      between an agent and a drained vault is the veto plus watcher review.
 ///      Those are real, but they are social defences on a hot path.
 ///
 ///      A strategy contract narrows the surface to something a reviewer can

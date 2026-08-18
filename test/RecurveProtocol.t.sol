@@ -6,7 +6,7 @@ import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {RecurveVault} from "../src/RecurveVault.sol";
 import {RecurveGovernor} from "../src/RecurveGovernor.sol";
-import {GuardianRegistry} from "../src/GuardianRegistry.sol";
+import {WatcherRegistry} from "../src/WatcherRegistry.sol";
 
 contract MockUSD is ERC20 {
     constructor() ERC20("Mock USD", "mUSD") {}
@@ -43,15 +43,15 @@ contract RecurveProtocolTest is Test {
     MockReve internal reve;
     RecurveVault internal vault;
     RecurveGovernor internal governor;
-    GuardianRegistry internal registry;
+    WatcherRegistry internal registry;
     MockStrategy internal strategy;
 
     address internal agent = makeAddr("agent");
     address internal alice = makeAddr("alice");
     address internal bob = makeAddr("bob");
     address internal carol = makeAddr("carol");
-    address internal guardian1 = makeAddr("guardian1");
-    address internal guardian2 = makeAddr("guardian2");
+    address internal watcher1 = makeAddr("watcher1");
+    address internal watcher2 = makeAddr("watcher2");
     address internal treasury = makeAddr("treasury");
     address internal admin = makeAddr("admin");
 
@@ -66,7 +66,7 @@ contract RecurveProtocolTest is Test {
         usd = new MockUSD();
         reve = new MockReve();
 
-        registry = new GuardianRegistry(IERC20(address(reve)), MIN_STAKE, UNSTAKE_DELAY, admin);
+        registry = new WatcherRegistry(IERC20(address(reve)), MIN_STAKE, UNSTAKE_DELAY, admin);
 
         // The vault and governor reference each other, so precompute the governor
         // address and deploy in a fixed order.
@@ -94,8 +94,8 @@ contract RecurveProtocolTest is Test {
         usd.mint(bob, 1_000_000e18);
         usd.mint(carol, 1_000_000e18);
         usd.mint(agent, 1_000_000e18);
-        reve.mint(guardian1, 100_000e18);
-        reve.mint(guardian2, 100_000e18);
+        reve.mint(watcher1, 100_000e18);
+        reve.mint(watcher2, 100_000e18);
 
         // The agent pays the performance fee out of its own balance on settle.
         vm.prank(agent);
@@ -115,7 +115,7 @@ contract RecurveProtocolTest is Test {
         vm.roll(block.number + 1);
     }
 
-    function _stakeGuardian(address who, uint256 amount) internal {
+    function _stakeWatcher(address who, uint256 amount) internal {
         vm.startPrank(who);
         reve.approve(address(registry), amount);
         registry.stake(amount);
@@ -360,34 +360,34 @@ contract RecurveProtocolTest is Test {
         governor.veto(id);
     }
 
-    // ---------------------------------------------------------------- guardians
+    // ---------------------------------------------------------------- watchers
 
-    function test_guardianBlocks_stopExecution() public {
+    function test_watcherBlocks_stopExecution() public {
         _deposit(alice, 1_000e18);
-        _stakeGuardian(guardian1, MIN_STAKE);
-        _stakeGuardian(guardian2, MIN_STAKE);
+        _stakeWatcher(watcher1, MIN_STAKE);
+        _stakeWatcher(watcher2, MIN_STAKE);
 
         bytes32 id = _propose(100e18);
 
-        vm.prank(guardian1);
-        registry.castVerdict(id, GuardianRegistry.Verdict.Block);
-        vm.prank(guardian2);
-        registry.castVerdict(id, GuardianRegistry.Verdict.Block);
+        vm.prank(watcher1);
+        registry.castVerdict(id, WatcherRegistry.Verdict.Block);
+        vm.prank(watcher2);
+        registry.castVerdict(id, WatcherRegistry.Verdict.Block);
 
         skip(VETO_WINDOW + 1);
-        vm.expectRevert(RecurveGovernor.GuardiansBlocked.selector);
+        vm.expectRevert(RecurveGovernor.WatchersBlocked.selector);
         vm.prank(agent);
         governor.execute(id);
     }
 
-    function test_guardianBlocks_belowThresholdDoNotStop() public {
+    function test_watcherBlocks_belowThresholdDoNotStop() public {
         _deposit(alice, 1_000e18);
-        _stakeGuardian(guardian1, MIN_STAKE);
+        _stakeWatcher(watcher1, MIN_STAKE);
 
         bytes32 id = _propose(100e18);
 
-        vm.prank(guardian1);
-        registry.castVerdict(id, GuardianRegistry.Verdict.Block);
+        vm.prank(watcher1);
+        registry.castVerdict(id, WatcherRegistry.Verdict.Block);
 
         skip(VETO_WINDOW + 1);
         vm.prank(agent);
@@ -396,42 +396,42 @@ contract RecurveProtocolTest is Test {
     }
 
     function test_castVerdict_requiresMinStake() public {
-        _stakeGuardian(guardian1, MIN_STAKE - 1);
+        _stakeWatcher(watcher1, MIN_STAKE - 1);
         bytes32 id = keccak256("proposal");
 
-        vm.expectRevert(GuardianRegistry.BelowMinStake.selector);
-        vm.prank(guardian1);
-        registry.castVerdict(id, GuardianRegistry.Verdict.Approve);
+        vm.expectRevert(WatcherRegistry.BelowMinStake.selector);
+        vm.prank(watcher1);
+        registry.castVerdict(id, WatcherRegistry.Verdict.Approve);
     }
 
     function test_castVerdict_isFinal() public {
-        _stakeGuardian(guardian1, MIN_STAKE);
+        _stakeWatcher(watcher1, MIN_STAKE);
         bytes32 id = keccak256("proposal");
 
-        vm.prank(guardian1);
-        registry.castVerdict(id, GuardianRegistry.Verdict.Approve);
+        vm.prank(watcher1);
+        registry.castVerdict(id, WatcherRegistry.Verdict.Approve);
 
-        vm.expectRevert(GuardianRegistry.AlreadyVoted.selector);
-        vm.prank(guardian1);
-        registry.castVerdict(id, GuardianRegistry.Verdict.Block);
+        vm.expectRevert(WatcherRegistry.AlreadyVoted.selector);
+        vm.prank(watcher1);
+        registry.castVerdict(id, WatcherRegistry.Verdict.Block);
     }
 
     function test_convict_burnsApproverStakeOnly() public {
-        _stakeGuardian(guardian1, MIN_STAKE);
-        _stakeGuardian(guardian2, MIN_STAKE);
+        _stakeWatcher(watcher1, MIN_STAKE);
+        _stakeWatcher(watcher2, MIN_STAKE);
 
         bytes32 id = keccak256("malicious");
 
-        vm.prank(guardian1);
-        registry.castVerdict(id, GuardianRegistry.Verdict.Approve);
-        vm.prank(guardian2);
-        registry.castVerdict(id, GuardianRegistry.Verdict.Block);
+        vm.prank(watcher1);
+        registry.castVerdict(id, WatcherRegistry.Verdict.Approve);
+        vm.prank(watcher2);
+        registry.castVerdict(id, WatcherRegistry.Verdict.Block);
 
         vm.prank(address(governor));
         registry.convict(id);
 
-        (uint256 stake1,,, bool active1) = registry.guardians(guardian1);
-        (uint256 stake2,,, bool active2) = registry.guardians(guardian2);
+        (uint256 stake1,,, bool active1) = registry.watchers(watcher1);
+        (uint256 stake2,,, bool active2) = registry.watchers(watcher2);
 
         assertEq(stake1, 0, "approver must be wiped out");
         assertFalse(active1);
@@ -441,73 +441,73 @@ contract RecurveProtocolTest is Test {
     }
 
     function test_convict_burnsRatherThanRedistributes() public {
-        _stakeGuardian(guardian1, MIN_STAKE);
-        _stakeGuardian(guardian2, MIN_STAKE);
+        _stakeWatcher(watcher1, MIN_STAKE);
+        _stakeWatcher(watcher2, MIN_STAKE);
 
         bytes32 id = keccak256("malicious");
-        vm.prank(guardian1);
-        registry.castVerdict(id, GuardianRegistry.Verdict.Approve);
-        vm.prank(guardian2);
-        registry.castVerdict(id, GuardianRegistry.Verdict.Block);
+        vm.prank(watcher1);
+        registry.castVerdict(id, WatcherRegistry.Verdict.Approve);
+        vm.prank(watcher2);
+        registry.castVerdict(id, WatcherRegistry.Verdict.Block);
 
-        uint256 blockerBefore = reve.balanceOf(guardian2);
+        uint256 blockerBefore = reve.balanceOf(watcher2);
 
         vm.prank(address(governor));
         registry.convict(id);
 
         // Nobody profits from a conviction — otherwise convicting becomes an attack.
-        assertEq(reve.balanceOf(guardian2), blockerBefore);
+        assertEq(reve.balanceOf(watcher2), blockerBefore);
         assertEq(reve.balanceOf(address(0xdead)), MIN_STAKE);
     }
 
     function test_convict_cannotReplay() public {
-        _stakeGuardian(guardian1, MIN_STAKE);
+        _stakeWatcher(watcher1, MIN_STAKE);
         bytes32 id = keccak256("malicious");
-        vm.prank(guardian1);
-        registry.castVerdict(id, GuardianRegistry.Verdict.Approve);
+        vm.prank(watcher1);
+        registry.castVerdict(id, WatcherRegistry.Verdict.Approve);
 
         vm.prank(address(governor));
         registry.convict(id);
 
-        vm.expectRevert(GuardianRegistry.AlreadyConvicted.selector);
+        vm.expectRevert(WatcherRegistry.AlreadyConvicted.selector);
         vm.prank(address(governor));
         registry.convict(id);
     }
 
     function test_convict_onlyGovernor() public {
         bytes32 id = keccak256("malicious");
-        vm.expectRevert(GuardianRegistry.OnlyGovernor.selector);
+        vm.expectRevert(WatcherRegistry.OnlyGovernor.selector);
         vm.prank(alice);
         registry.convict(id);
     }
 
     function test_unstake_requiresDelay() public {
-        _stakeGuardian(guardian1, MIN_STAKE);
+        _stakeWatcher(watcher1, MIN_STAKE);
 
-        vm.prank(guardian1);
+        vm.prank(watcher1);
         registry.requestUnstake(MIN_STAKE);
 
-        vm.expectRevert(GuardianRegistry.UnstakeNotReady.selector);
-        vm.prank(guardian1);
+        vm.expectRevert(WatcherRegistry.UnstakeNotReady.selector);
+        vm.prank(watcher1);
         registry.unstake();
 
         skip(UNSTAKE_DELAY + 1);
-        vm.prank(guardian1);
+        vm.prank(watcher1);
         registry.unstake();
 
-        (uint256 remaining,,,) = registry.guardians(guardian1);
+        (uint256 remaining,,,) = registry.watchers(watcher1);
         assertEq(remaining, 0);
     }
 
     function test_unstake_stakeStaysSlashableDuringDelay() public {
-        _stakeGuardian(guardian1, MIN_STAKE);
+        _stakeWatcher(watcher1, MIN_STAKE);
         bytes32 id = keccak256("malicious");
 
-        vm.prank(guardian1);
-        registry.castVerdict(id, GuardianRegistry.Verdict.Approve);
+        vm.prank(watcher1);
+        registry.castVerdict(id, WatcherRegistry.Verdict.Approve);
 
-        // Guardian tries to exit right after approving.
-        vm.prank(guardian1);
+        // Watcher tries to exit right after approving.
+        vm.prank(watcher1);
         registry.requestUnstake(MIN_STAKE);
 
         vm.prank(address(governor));
@@ -517,11 +517,11 @@ contract RecurveProtocolTest is Test {
 
         // Conviction wiped the stake and the pending request with it — there is
         // nothing left to withdraw.
-        vm.expectRevert(GuardianRegistry.NoPendingUnstake.selector);
-        vm.prank(guardian1);
+        vm.expectRevert(WatcherRegistry.NoPendingUnstake.selector);
+        vm.prank(watcher1);
         registry.unstake();
 
-        assertEq(reve.balanceOf(guardian1), 100_000e18 - MIN_STAKE, "nothing should come back");
+        assertEq(reve.balanceOf(watcher1), 100_000e18 - MIN_STAKE, "nothing should come back");
     }
 
     // ---------------------------------------------------------------- fees
