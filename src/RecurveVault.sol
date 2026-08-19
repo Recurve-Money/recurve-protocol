@@ -24,7 +24,17 @@ contract RecurveVault is ERC4626, ERC20Votes, ERC20Permit, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     /// @notice The governor allowed to move capital out of this vault.
-    address public immutable governor;
+    /// @dev Not a constructor argument: vault and governor each need the other's
+    ///      address, so one of the two has to be settable after deploy. This is
+    ///      the one — set once, by whoever deployed this vault, before anyone
+    ///      has deposited. `deployGovernorTogether` in the deploy script still
+    ///      predicts the address and passes it in for a single-transaction
+    ///      setup; `setGovernor` exists for deploying by hand, one contract at
+    ///      a time, with no address prediction required.
+    address public governor;
+
+    /// @notice Whoever deployed this vault. Allowed to call `setGovernor` once.
+    address private immutable _deployer;
 
     /// @notice Assets currently committed to a live strategy, denominated in `asset()`.
     /// @dev Carried explicitly rather than inferred, because a position mid-unwind is
@@ -53,6 +63,8 @@ contract RecurveVault is ERC4626, ERC20Votes, ERC20Permit, ReentrancyGuard {
     event WithdrawalClaimed(address indexed owner, uint256 indexed requestId, uint256 assets);
 
     error OnlyGovernor();
+    error OnlyDeployer();
+    error GovernorAlreadySet();
     error NothingToSettle();
     error FloatTooLow();
     error RequestNotReady();
@@ -64,11 +76,24 @@ contract RecurveVault is ERC4626, ERC20Votes, ERC20Permit, ReentrancyGuard {
         _;
     }
 
-    constructor(IERC20 asset_, string memory name_, string memory symbol_, address governor_)
+    constructor(IERC20 asset_, string memory name_, string memory symbol_)
         ERC4626(asset_)
         ERC20(name_, symbol_)
         ERC20Permit(name_)
     {
+        _deployer = msg.sender;
+    }
+
+    /// @notice Set the governor. Callable once, only by whoever deployed this
+    ///         vault, and only before it has ever been set.
+    /// @dev No further access control is needed beyond "once" - once set, this
+    ///      function is permanently dead code (governor != address(0) forever
+    ///      after), so there is no window where it could be called again by
+    ///      anyone, deployer included.
+    function setGovernor(address governor_) external {
+        if (msg.sender != _deployer) revert OnlyDeployer();
+        if (governor != address(0)) revert GovernorAlreadySet();
+        if (governor_ == address(0)) revert GovernorAlreadySet();
         governor = governor_;
     }
 

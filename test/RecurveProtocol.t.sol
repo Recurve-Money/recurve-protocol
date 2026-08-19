@@ -68,11 +68,7 @@ contract RecurveProtocolTest is Test {
 
         registry = new WatcherRegistry(IERC20(address(reve)), MIN_STAKE, UNSTAKE_DELAY, admin);
 
-        // The vault and governor reference each other, so precompute the governor
-        // address and deploy in a fixed order.
-        address governorAddr =
-            vm.computeCreateAddress(address(this), vm.getNonce(address(this)) + 1);
-        vault = new RecurveVault(IERC20(address(usd)), "Recurve Fund", "rvFUND", governorAddr);
+        vault = new RecurveVault(IERC20(address(usd)), "Recurve Fund", "rvFUND");
         governor = new RecurveGovernor(
             vault,
             registry,
@@ -83,7 +79,7 @@ contract RecurveProtocolTest is Test {
             PERF_FEE_BPS,
             treasury
         );
-        assertEq(address(governor), governorAddr, "governor address prediction");
+        vault.setGovernor(address(governor));
 
         vm.prank(admin);
         registry.setGovernor(address(governor));

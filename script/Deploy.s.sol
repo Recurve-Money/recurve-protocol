@@ -8,9 +8,11 @@ import {RecurveGovernor} from "../src/RecurveGovernor.sol";
 import {WatcherRegistry} from "../src/WatcherRegistry.sol";
 
 /// @notice Deploys a registry plus one vault/governor pair.
-/// @dev The vault and governor reference each other, so the governor address is
-///      precomputed and the pair deployed in a fixed order. Getting this wrong
-///      bricks the vault, which is why the script asserts the prediction held.
+/// @dev Straight-line order, no address prediction: the vault's governor is set
+///      after both exist, via RecurveVault.setGovernor (see that function for
+///      why). Kept this way even for the scripted path so the same sequence
+///      works whether it's run by forge or reproduced by hand in a UI that has
+///      no way to predict a not-yet-deployed address.
 contract Deploy is Script {
     function run() external {
         uint256 pk = vm.envUint("PRIVATE_KEY");
@@ -24,9 +26,7 @@ contract Deploy is Script {
         vm.startBroadcast(pk);
 
         WatcherRegistry registry = new WatcherRegistry(reve, 1_000e18, 7 days, deployer);
-
-        address predicted = vm.computeCreateAddress(deployer, vm.getNonce(deployer) + 1);
-        RecurveVault vault = new RecurveVault(asset, "Recurve Fund", "rvFUND", predicted);
+        RecurveVault vault = new RecurveVault(asset, "Recurve Fund", "rvFUND");
         RecurveGovernor governor = new RecurveGovernor(
             vault,
             registry,
@@ -37,8 +37,8 @@ contract Deploy is Script {
             500, // 5% performance fee on profit — matches Sherwood's "Agent fee"
             treasury
         );
-        require(address(governor) == predicted, "governor address mismatch");
 
+        vault.setGovernor(address(governor));
         registry.setGovernor(address(governor));
 
         vm.stopBroadcast();
