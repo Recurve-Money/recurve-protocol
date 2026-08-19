@@ -4,6 +4,7 @@ out = "out"
 libs = ["lib"]
 test = "test"
 solc = "0.8.28"
+evm_version = "paris" # testnet (chain 46630) doesn't support PUSH0 (Shanghai+); target pre-Shanghai
 via_ir = true
 optimizer = true
 optimizer_runs = 200
