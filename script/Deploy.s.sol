@@ -34,7 +34,7 @@ contract Deploy is Script {
             24 hours, // veto window — matches Sherwood's "Voting window"
             2000, // 20% of supply vetoes — matches Sherwood's "Guardian veto"
             2, // watcher blocks needed to stop execution
-            400, // 4% performance fee on profit
+            500, // 5% performance fee on profit — matches Sherwood's "Agent fee"
             treasury
         );
 
