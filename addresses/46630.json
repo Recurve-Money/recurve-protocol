@@ -1,0 +1,19 @@
+{
+  "chainId": 46630,
+  "name": "Robinhood Chain Testnet",
+  "deployedAt": "2026-08-20",
+  "deployer": "0x66166Bda0F185e748B73701923a5A9AA35e4130b",
+  "RecurveToken": "0xf103C471DBCDE5C856559380432eFDC7e59Af9ec",
+  "vaults": [
+    {
+      "slug": "main",
+      "name": "Recurve Fund",
+      "symbol": "rvFUND",
+      "WatcherRegistry": "0x26ebF51c3D6967895F83b5C33664d99F1E42c97D",
+      "RecurveVault": "0x235d0cE2Ca846495E9B9f18959A41f0625c0443D",
+      "RecurveGovernor": "0xe0e209799d57E6A95F72BdAe4b148cEf6f03da1a",
+      "deployBlock": 103992284
+    }
+  ],
+  "_note": "A second full deploy (bash deploy2.sh run twice) also landed on-chain and is intentionally left unused: WatcherRegistry 0x85ec1691c2c3ACf3BE1679941ecFA4e48926d433, RecurveVault 0x4BC2B428800638a5764bD212F23f81B6Fc2f7f36, RecurveGovernor 0x706Fc9294A46F2F435d96C3f1Ff74bEaF79266DF."
+}
