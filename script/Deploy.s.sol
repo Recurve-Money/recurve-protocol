@@ -31,10 +31,10 @@ contract Deploy is Script {
             vault,
             registry,
             agent,
-            6 hours, // veto window
-            3000, // 30% of supply vetoes
+            24 hours, // veto window — matches Sherwood's "Voting window"
+            2000, // 20% of supply vetoes — matches Sherwood's "Guardian veto"
             2, // watcher blocks needed to stop execution
-            1500, // 15% performance fee on profit
+            500, // 5% performance fee on profit — matches Sherwood's "Agent fee"
             treasury
         );
         require(address(governor) == predicted, "governor address mismatch");
