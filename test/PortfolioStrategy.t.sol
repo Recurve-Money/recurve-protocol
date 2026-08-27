@@ -66,7 +66,7 @@ contract PortfolioStrategyTest is Test {
 
         registry = new WatcherRegistry(IERC20(address(reve)), 1_000e18, 7 days, admin);
 
-        vault = new RecurveVault(IERC20(address(usd)), "Fund", "rvF");
+        vault = new RecurveVault(IERC20(address(usd)), "Fund", "rvF", type(uint256).max);
         governor = new RecurveGovernor(vault, registry, agent, 6 hours, 3000, 2, 1500, treasury);
         vault.setGovernor(address(governor));
 

@@ -68,7 +68,7 @@ contract RecurveProtocolTest is Test {
 
         registry = new WatcherRegistry(IERC20(address(reve)), MIN_STAKE, UNSTAKE_DELAY, admin);
 
-        vault = new RecurveVault(IERC20(address(usd)), "Recurve Fund", "rvFUND");
+        vault = new RecurveVault(IERC20(address(usd)), "Recurve Fund", "rvFUND", type(uint256).max);
         governor = new RecurveGovernor(
             vault,
             registry,

@@ -9,6 +9,7 @@ import {Nonces} from "@openzeppelin/contracts/utils/Nonces.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 /// @title RecurveVault
 /// @notice The onchain identity of a fund. Holds every position, mints shares that
@@ -41,6 +42,15 @@ contract RecurveVault is ERC4626, ERC20Votes, ERC20Permit, ReentrancyGuard {
     ///      neither in the float nor visible to `balanceOf`.
     uint256 public deployedAssets;
 
+    /// @notice Ceiling on `totalAssets()`, enforced via `maxDeposit`/`maxMint`.
+    /// @dev Not a permanent limit — a deliberately conservative starting point before
+    ///      an independent audit, raised (never silently removed) by the deployer once
+    ///      one closes. Depositors already in the vault are never affected by a change
+    ///      here; it only gates new deposits.
+    uint256 public depositCap;
+
+    event DepositCapRaised(uint256 previousCap, uint256 newCap);
+
     /// @notice Total assets owed to depositors whose redemption is waiting on an unwind.
     uint256 public pendingWithdrawalAssets;
 
@@ -70,18 +80,31 @@ contract RecurveVault is ERC4626, ERC20Votes, ERC20Permit, ReentrancyGuard {
     error RequestNotReady();
     error RequestAlreadyClaimed();
     error NotRequestOwner();
+    error CapCannotDecrease();
 
     modifier onlyGovernor() {
         if (msg.sender != governor) revert OnlyGovernor();
         _;
     }
 
-    constructor(IERC20 asset_, string memory name_, string memory symbol_)
+    constructor(IERC20 asset_, string memory name_, string memory symbol_, uint256 depositCap_)
         ERC4626(asset_)
         ERC20(name_, symbol_)
         ERC20Permit(name_)
     {
         _deployer = msg.sender;
+        depositCap = depositCap_;
+    }
+
+    /// @notice Raise the cap on total vault assets. Deployer-only, and one-directional:
+    ///         this can only ever grow the cap, never shrink it — a shrinking cap could
+    ///         strand a depositor mid-deposit for no protective reason, since it does
+    ///         nothing to money already in the vault.
+    function raiseDepositCap(uint256 newCap) external {
+        if (msg.sender != _deployer) revert OnlyDeployer();
+        if (newCap <= depositCap) revert CapCannotDecrease();
+        emit DepositCapRaised(depositCap, newCap);
+        depositCap = newCap;
     }
 
     /// @notice Set the governor. Callable once, only by whoever deployed this
@@ -209,6 +232,20 @@ contract RecurveVault is ERC4626, ERC20Votes, ERC20Permit, ReentrancyGuard {
     }
 
     // ---------------------------------------------------------------- overrides
+
+    /// @notice Remaining room under the cap, in `asset()` terms. Standard ERC-4626
+    ///         hook — `deposit()` already reverts above this via the inherited
+    ///         `ERC4626ExceededMaxDeposit` check, so the cap needs enforcing here once,
+    ///         not duplicated at every call site.
+    function maxDeposit(address) public view override returns (uint256) {
+        uint256 total = totalAssets();
+        return total >= depositCap ? 0 : depositCap - total;
+    }
+
+    /// @notice Same ceiling as `maxDeposit`, expressed in shares for `mint()`.
+    function maxMint(address) public view override returns (uint256) {
+        return _convertToShares(maxDeposit(address(0)), Math.Rounding.Floor);
+    }
 
     function decimals() public view override(ERC4626, ERC20) returns (uint8) {
         return ERC4626.decimals();

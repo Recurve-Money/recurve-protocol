@@ -3,6 +3,7 @@ pragma solidity 0.8.28;
 
 import {Script, console} from "forge-std/Script.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {RecurveVault} from "../src/RecurveVault.sol";
 import {RecurveGovernor} from "../src/RecurveGovernor.sol";
 import {WatcherRegistry} from "../src/WatcherRegistry.sol";
@@ -26,7 +27,11 @@ contract Deploy is Script {
         vm.startBroadcast(pk);
 
         WatcherRegistry registry = new WatcherRegistry(reve, 1_000e18, 7 days, deployer);
-        RecurveVault vault = new RecurveVault(asset, "Recurve Fund", "rvFUND");
+        // Cap conservative by default until an audit closes -- override with
+        // DEPOSIT_CAP=<amount in whole units of VAULT_ASSET> if that default is wrong
+        // for this asset's decimals or this fund's intended size.
+        uint256 cap = vm.envOr("DEPOSIT_CAP", uint256(10)) * (10 ** IERC20Metadata(address(asset)).decimals());
+        RecurveVault vault = new RecurveVault(asset, "Recurve Fund", "rvFUND", cap);
         RecurveGovernor governor = new RecurveGovernor(
             vault,
             registry,
