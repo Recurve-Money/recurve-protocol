@@ -13,7 +13,7 @@
       "RecurveVault": "0x235d0cE2Ca846495E9B9f18959A41f0625c0443D",
       "RecurveGovernor": "0xe0e209799d57E6A95F72BdAe4b148cEf6f03da1a",
       "deployBlock": 103992284,
-      "PortfolioStrategy": "0x14c67b9EEA12A31d82f200EA5D3a9C1B167b84b7"
+      "PortfolioStrategy": "0x1D489C89F98d0e87b53941FA4fF9737360BF1b99"
     }
   ],
   "_note": "A second full deploy (bash deploy2.sh run twice) also landed on-chain and is intentionally left unused: WatcherRegistry 0x85ec1691c2c3ACf3BE1679941ecFA4e48926d433, RecurveVault 0x4BC2B428800638a5764bD212F23f81B6Fc2f7f36, RecurveGovernor 0x706Fc9294A46F2F435d96C3f1Ff74bEaF79266DF."
