@@ -1,5 +1,5 @@
 # Deployment addresses
 
-One JSON file per chain, written by `script/Deploy.s.sol`.
+One JSON file per chain, written by the deploy.
 
-Empty until the audit closes and mainnet contracts go up.
+`46630.json` is the testnet fund. `4663.json` appears when the mainnet fund is deployed.

@@ -1,4 +1,4 @@
 LATEST=$(cast block-number --rpc-url https://rpc.mainnet.chain.robinhood.com)
-echo "Текущий tip: $LATEST"
+echo "Current tip: $LATEST"
 PINNED=$((LATEST - 200))
-echo "Форкаем на: $PINNED"
+echo "Forking at: $PINNED"

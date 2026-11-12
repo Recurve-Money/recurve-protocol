@@ -2,11 +2,11 @@
 
 Solidity contracts for agent-run funds. Depositors pool capital into an ERC-4626 vault;
 a registered agent posts strategies; shareholders veto under optimistic governance;
-staked $REVE watchers replay the calldata before it executes. The contracts hold the
+staked $RECURVE watchers replay the calldata before it executes. The contracts hold the
 line — agents operate, depositors keep the exit.
 
 Built with Foundry and OpenZeppelin v5, Solidity `0.8.28`, `via_ir` compilation.
-Protocol docs: **https://docs.recurvemoney.xyz/**
+Protocol docs: **https://www.recurvemoney.xyz/docs**
 
 ## Contracts
 
@@ -14,7 +14,9 @@ Protocol docs: **https://docs.recurvemoney.xyz/**
 |----------|-------------|
 | `src/RecurveVault.sol` | ERC-4626 vault plus `ERC20Votes`, so shares carry voting weight and the governor can snapshot it. Holds every position. Redemptions clear instantly against the idle float; when the float is short the request queues and settles at the price realized when the agent unwinds. Capital leaves only through `fundStrategy`, and only the governor can call it. |
 | `src/RecurveGovernor.sol` | Proposal lifecycle: propose → veto window → watcher review → execute → settle. One governor per vault. Charges the performance fee on profit at settlement. |
-| `src/WatcherRegistry.sol` | Stake, verdicts, and slashing. Watchers stake $REVE to become eligible, cast one final verdict per proposal, and forfeit the entire stake if a proposal they approved is later convicted. |
+| `src/WatcherRegistry.sol` | Stake, verdicts, and slashing. Watchers stake $RECURVE to become eligible, cast one final verdict per proposal, and forfeit the entire stake if a proposal they approved is later convicted. The stake token is named in the constructor or once afterwards (`setStakeToken`), so a fund can open before its token exists; until it is named nobody can stake, so nobody can rule. |
+| `src/strategies/PortfolioStrategyV2.sol` | What the fund's capital may do: a basket fixed at construction, bought and sold through one Uniswap V3 pool per token under a slippage cap, with the vault as the only way out. |
+| `src/RecurveToken.sol` | A fixed-supply ERC-20 with no owner, for a deployment that has no token of its own yet. The testnet fund uses it. |
 
 ## Why optimistic governance
 
@@ -53,10 +55,15 @@ the gain and eats its part of the loss — the same as staying, which is the poi
 ## Layout
 
 ```
-src/                 core contracts
-test/                Foundry tests, unit + fuzz
-script/Deploy.s.sol  registry + vault/governor pair
-.github/workflows/   fmt, build --sizes, test, coverage
+src/                           core contracts and strategies
+test/                          Foundry tests, unit + fuzz
+script/Deploy.s.sol            registry + vault/governor pair
+script/DeployStrategyV2.s.sol  the strategy
+script/DeployMainnet.s.sol     all of it in one run, for Robinhood Chain mainnet
+deploy-mainnet.sh, handover.sh the mainnet deploy from a terminal (DEPLOY-MAINNET.md)
+mainnet.env                    its settings, public values only
+addresses/                     one file per chain, written by the deploy
+chains/                        the external contracts each chain's deploy relies on
 ```
 
 ## Build
@@ -67,14 +74,14 @@ forge build
 forge test
 ```
 
-Fuzz runs default to 512 locally and 5000 in CI (`FOUNDRY_PROFILE=ci`).
+Fuzz runs default to 512; `FOUNDRY_PROFILE=ci` runs 5000.
 
 ## Deploy
 
 ```bash
 export PRIVATE_KEY=0x...
 export VAULT_ASSET=0x...   # the ERC-20 the fund denominates in
-export REVE_TOKEN=0x...     # the token watchers stake
+export REVE_TOKEN=0x...     # $RECURVE, the token watchers stake
 export AGENT=0x...
 export TREASURY=0x...
 
@@ -85,14 +92,26 @@ The vault and governor reference each other, so the script precomputes the gover
 address and asserts the prediction held before wiring the registry. If that assert ever
 trips, stop — a vault pointing at the wrong governor can never move capital again.
 
+### Robinhood Chain mainnet
+
+[DEPLOY-MAINNET.md](DEPLOY-MAINNET.md) is the runbook: what it costs, the addresses it
+relies on, and the two scripts, each of which simulates unless given `--broadcast`. It was
+rehearsed end to end on a fork of mainnet.
+
+The website's `/admin` page deploys the same contracts from a browser wallet, from the
+bytecode this repository builds. It deploys the registry with no stake token and names
+$RECURVE later, once, with `setStakeToken`.
+
 ## Deployment addresses
 
-Mainnet addresses land in `addresses/` once the audit closes. Nothing here is audited
-yet; treat anything you deploy from this repo as unaudited.
+`addresses/46630.json` is the testnet fund. `addresses/4663.json` is written when the
+mainnet fund is deployed.
 
 ## Security
 
-Third-party audit pending. Contracts are source-verified onchain at deploy time.
+The contracts have not been independently audited; treat anything you deploy from this
+repository as unaudited. What they do not do is listed plainly under
+[Known limitations](https://www.recurvemoney.xyz/docs/contracts#limitations).
 
 Report anything you find to **security@recurvemoney.xyz** rather than opening an issue.
 
