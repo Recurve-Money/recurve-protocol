@@ -15,16 +15,21 @@ run = json.load(open(os.path.join(HERE, "broadcast/DeployMainnet.s.sol/4663/run-
 # every transaction in it succeeded.
 if run.get("chain") != 4663:
     sys.exit(f"the broadcast is for chain {run.get('chain')}, not 4663")
-receipts = {r["transactionHash"]: r for r in run["receipts"]}
+# forge writes the receipts in the order of the transactions. A transaction's
+# own `hash` field is not a key to them: on a fork it pointed at another
+# transaction's receipt. So they are paired by position, and every contract
+# creation is checked against the address its receipt says was created.
+transactions, receipts = run["transactions"], run["receipts"]
+if len(transactions) != len(receipts):
+    sys.exit(f"{len(transactions)} transactions but {len(receipts)} receipts: the deploy did not finish")
 created = {}
 block = {}
-for tx in run["transactions"]:
-    receipt = receipts.get(tx["hash"])
-    if receipt is None:
-        sys.exit(f"no receipt for transaction {tx['hash']}: the deploy did not finish")
+for tx, receipt in zip(transactions, receipts):
     if int(receipt["status"], 16) != 1:
-        sys.exit(f"transaction {tx['hash']} failed")
+        sys.exit(f"transaction {receipt['transactionHash']} failed")
     if tx["transactionType"] == "CREATE":
+        if (receipt.get("contractAddress") or "").lower() != tx["contractAddress"].lower():
+            sys.exit(f"the receipt for {tx['contractName']} names another contract: {receipt.get('contractAddress')}")
         created[tx["contractName"]] = tx["contractAddress"]
         block[tx["contractName"]] = int(receipt["blockNumber"], 16)
 missing = [name for name in ("WatcherRegistry", "RecurveVault", "RecurveGovernor", "PortfolioStrategyV2") if name not in created]

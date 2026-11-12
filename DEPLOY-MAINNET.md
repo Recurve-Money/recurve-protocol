@@ -19,12 +19,12 @@ inside it as `protocol/`, and the runner as `runner/`.
 
 | Transaction | Gas (mainnet estimate) |
 |---|---|
-| RecurveToken | 510,263 |
-| WatcherRegistry | 962,162 |
-| RecurveVault | 2,906,624 |
-| RecurveGovernor | 1,544,223 |
+| RecurveToken | 501,487 |
+| WatcherRegistry | 1,002,843 |
+| RecurveVault | 2,945,290 |
+| RecurveGovernor | 1,532,148 |
 | `vault.setGovernor`, `registry.setGovernor` | ~92,000 |
-| PortfolioStrategyV2 | 1,156,395 |
+| PortfolioStrategyV2 | 1,153,322 |
 | **Total** | **≈ 7.2M** |
 
 At the 2026-10-31 gas price (0.02 gwei, no priority fee on this chain) that
