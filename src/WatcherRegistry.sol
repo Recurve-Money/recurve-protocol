@@ -19,7 +19,10 @@ contract WatcherRegistry is Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     /// @notice The token watchers stake.
-    IERC20 public immutable stakeToken;
+    /// @dev Set in the constructor, or once later by the owner, so a fund can open
+    ///      before its token exists. Until then nobody can stake, so nobody can rule,
+    ///      and `blockCount` stays zero: the fund runs on the depositors' veto alone.
+    IERC20 public stakeToken;
 
     /// @notice Minimum stake required to cast a verdict.
     uint256 public minStake;
@@ -68,6 +71,7 @@ contract WatcherRegistry is Ownable, ReentrancyGuard {
     event VerdictCast(bytes32 indexed proposalId, address indexed watcher, Verdict verdict);
     event Convicted(bytes32 indexed proposalId, uint256 watchersSlashed, uint256 stakeBurned);
     event GovernorUpdated(address indexed governor);
+    event StakeTokenSet(IERC20 indexed token);
     event ParametersUpdated(uint256 minStake, uint256 unstakeDelay);
 
     error OnlyGovernor();
@@ -78,6 +82,8 @@ contract WatcherRegistry is Ownable, ReentrancyGuard {
     error AlreadyVoted();
     error AlreadyConvicted();
     error ZeroAmount();
+    error StakeTokenAlreadySet();
+    error ZeroToken();
 
     modifier onlyGovernor() {
         if (msg.sender != governor) revert OnlyGovernor();
@@ -212,6 +218,15 @@ contract WatcherRegistry is Ownable, ReentrancyGuard {
     }
 
     // ---------------------------------------------------------------- admin
+
+    /// @notice Name the stake token, if the constructor did not. Once only: stake
+    ///         already held in one token can never be paid out in another.
+    function setStakeToken(IERC20 stakeToken_) external onlyOwner {
+        if (address(stakeToken) != address(0)) revert StakeTokenAlreadySet();
+        if (address(stakeToken_) == address(0)) revert ZeroToken();
+        stakeToken = stakeToken_;
+        emit StakeTokenSet(stakeToken_);
+    }
 
     function setGovernor(address governor_) external onlyOwner {
         governor = governor_;

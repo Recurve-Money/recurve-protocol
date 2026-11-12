@@ -5,8 +5,8 @@ import {Script, console} from "forge-std/Script.sol";
 import {RecurveToken} from "../src/RecurveToken.sol";
 
 /// @notice Deploys $RECURVE. Run this first — the printed address is what goes
-///         into REVE_TOKEN before running Deploy.s.sol, since WatcherRegistry
-///         takes that address as an immutable constructor argument.
+///         into REVE_TOKEN before running Deploy.s.sol, which hands it to
+///         WatcherRegistry's constructor as the stake token.
 contract DeployToken is Script {
     function run() external {
         uint256 pk = vm.envUint("PRIVATE_KEY");
