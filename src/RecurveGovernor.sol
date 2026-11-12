@@ -228,6 +228,12 @@ contract RecurveGovernor is ReentrancyGuard {
     /// @param returned Assets the strategy handed back, already sitting in the vault.
     /// @dev Fee applies to profit only. A losing strategy pays nothing — there is no
     ///      management fee to collect for losing money.
+    ///
+    ///      A strategy that came back through `vault.returnFromStrategy` has closed
+    ///      its deployment already, in the transaction that returned the assets;
+    ///      for it this call charges the fee and marks the proposal, and the vault's
+    ///      books do not move. Only a target that paid back with a plain transfer
+    ///      still has a deployment for the vault to close here.
     function settle(bytes32 proposalId, uint256 returned) external onlyAgent nonReentrant {
         Proposal storage p = proposals[proposalId];
         if (p.state != State.Executed) revert WrongState();
@@ -240,7 +246,7 @@ contract RecurveGovernor is ReentrancyGuard {
             fee = profit * performanceFeeBps / BPS;
         }
 
-        vault.settleStrategy(returned);
+        vault.settleStrategy(p.target, returned);
 
         if (fee > 0 && feeRecipient != address(0)) {
             IERC20(vault.asset()).safeTransferFrom(msg.sender, feeRecipient, fee);

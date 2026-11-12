@@ -25,6 +25,12 @@ interface ISwapRouter {
         returns (uint256 amountOut);
 }
 
+/// @notice The one call a strategy makes on its vault: capital goes back through
+///         it, so the vault closes the deployment in the same transaction.
+interface IStrategyVault {
+    function returnFromStrategy(uint256 assets) external;
+}
+
 /// @title PortfolioStrategy
 /// @notice A weighted basket the agent can rebalance, and nothing else.
 ///
@@ -210,14 +216,25 @@ contract PortfolioStrategyV2 is ReentrancyGuard {
 
     // ---------------------------------------------------------------- exit
 
-    /// @notice Send every base asset held back to the vault.
+    /// @notice Send every base asset held back to the vault, and close this
+    ///         strategy's deployment there.
     /// @dev The destination is immutable and set to the vault at construction,
     ///      so there is no version of this call that pays anyone else. Legs must
     ///      be sold first; whatever is unsold stays put rather than being
     ///      valued at a guess.
+    ///
+    ///      The assets go through `returnFromStrategy`, not a transfer, so the
+    ///      vault books them in and the deployment out in one step. That also
+    ///      makes this the end of the cycle as the vault sees it: anything
+    ///      still held here afterwards is off its books until it comes back,
+    ///      so the legs are sold before this is called, never after. With
+    ///      nothing to send it does nothing.
     function returnToVault() external onlyGovernor nonReentrant returns (uint256 amount) {
         amount = baseAsset.balanceOf(address(this));
-        if (amount > 0) baseAsset.safeTransfer(vault, amount);
+        if (amount > 0) {
+            baseAsset.forceApprove(vault, amount);
+            IStrategyVault(vault).returnFromStrategy(amount);
+        }
         emit Liquidated(amount);
     }
 

@@ -42,6 +42,10 @@ contract RecurveVault is ERC4626, ERC20Votes, ERC20Permit, ReentrancyGuard {
     ///      neither in the float nor visible to `balanceOf`.
     uint256 public deployedAssets;
 
+    /// @notice The part of `deployedAssets` booked to each strategy target. The
+    ///         parts always sum to `deployedAssets`.
+    mapping(address => uint256) public deployedTo;
+
     /// @notice Ceiling on `totalAssets()`, enforced via `maxDeposit`/`maxMint`.
     /// @dev Not a permanent limit — a deliberately conservative starting point before
     ///      an independent audit, raised (never silently removed) by the deployer once
@@ -75,7 +79,6 @@ contract RecurveVault is ERC4626, ERC20Votes, ERC20Permit, ReentrancyGuard {
     error OnlyGovernor();
     error OnlyDeployer();
     error GovernorAlreadySet();
-    error NothingToSettle();
     error FloatTooLow();
     error RequestNotReady();
     error RequestAlreadyClaimed();
@@ -143,19 +146,57 @@ contract RecurveVault is ERC4626, ERC20Votes, ERC20Permit, ReentrancyGuard {
     function fundStrategy(address target, uint256 assets) external onlyGovernor nonReentrant {
         if (assets > float()) revert FloatTooLow();
         deployedAssets += assets;
+        deployedTo[target] += assets;
         IERC20(asset()).safeTransfer(target, assets);
         emit StrategyFunded(target, assets);
     }
 
-    /// @notice Book the result of an unwind and clear the deployed balance.
-    /// @param assetsReturned Assets actually received back from the strategy.
-    /// @dev The caller transfers assets in before calling. `pnl` is reported rather
-    ///      than derived by callers so indexers do not have to reconstruct it.
-    function settleStrategy(uint256 assetsReturned) external onlyGovernor nonReentrant {
-        uint256 deployed = deployedAssets;
-        if (deployed == 0) revert NothingToSettle();
+    /// @notice A strategy hands capital back, and its deployment is closed in the
+    ///         same call.
+    /// @param assets Assets to pull from the caller, which must have approved them.
+    /// @dev This is the way back for a strategy. A plain transfer would leave the
+    ///      returned assets counted twice, in the balance and in `deployedAssets`,
+    ///      until the deployment was settled, and every exit in between would be
+    ///      paid on the inflated total at the expense of whoever stayed. Here the
+    ///      balance rises and the deployment falls together, so `totalAssets()`
+    ///      moves by exactly the gain or the loss, in one step.
+    ///
+    ///      Anyone may call it. A caller with nothing booked to it only gives the
+    ///      vault assets, which a transfer would do as well; the one deployment a
+    ///      caller can close is its own.
+    function returnFromStrategy(uint256 assets) external nonReentrant {
+        uint256 deployed = deployedTo[msg.sender];
+        if (deployed == 0 && assets == 0) return;
 
-        deployedAssets = 0;
+        deployedTo[msg.sender] = 0;
+        deployedAssets -= deployed;
+        if (assets > 0) IERC20(asset()).safeTransferFrom(msg.sender, address(this), assets);
+
+        _emitSettled(assets, deployed);
+    }
+
+    /// @notice Close whatever is still booked to `target`. For a venue that paid back
+    ///         with a plain transfer; after `returnFromStrategy` there is nothing
+    ///         left to close and this does nothing.
+    /// @param assetsReturned Assets received back from the target, as the governor
+    ///        was told. It goes into the event only; the balance is what it is.
+    function settleStrategy(address target, uint256 assetsReturned)
+        external
+        onlyGovernor
+        nonReentrant
+    {
+        uint256 deployed = deployedTo[target];
+        if (deployed == 0) return;
+
+        deployedTo[target] = 0;
+        deployedAssets -= deployed;
+
+        _emitSettled(assetsReturned, deployed);
+    }
+
+    /// @dev `pnl` is reported rather than derived by callers so indexers do not have
+    ///      to reconstruct it.
+    function _emitSettled(uint256 assetsReturned, uint256 deployed) private {
         // Both operands are bounded by the vault's asset balance, which cannot reach
         // 2**255 for any ERC-20 with a sane supply.
         // forge-lint: disable-next-line(unsafe-typecast)
