@@ -120,9 +120,9 @@ Two scripts, both simulate unless given `--broadcast`, both rehearsed on a fork
 ./handover.sh --broadcast         # registry owner, agentAdmin (and a minted $RECURVE supply) -> Safe
 ```
 
-Both scripts stop unless `TREASURY` is a contract on this chain that is neither
-of the two keys: a Safe is a contract, and the fee recipient and the ownership
-they hand out cannot be changed afterwards. `handover.sh` also stops if
+Both scripts stop unless `TREASURY` is a Safe on this chain (a contract that
+answers `getThreshold`) and neither of the two keys: the fee recipient and the
+ownership they hand out cannot be changed afterwards. `handover.sh` also stops if
 `TREASURY` is no longer the address the governor pays its fees to, and moves a
 $RECURVE balance only when the deploy minted the token. `cast` takes a key as
 a command-line argument, visible to other processes while it runs, so do this
