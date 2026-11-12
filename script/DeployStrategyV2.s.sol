@@ -22,7 +22,10 @@ contract DeployStrategyV2 is Script {
         address[] memory tokens = new address[](1);
         tokens[0] = nvda;
         uint24[] memory feeTiers = new uint24[](1);
-        feeTiers[0] = 3000; // the tier with real depth (5.1k ETH of liquidity) -- 500 has some, 10000 has none
+        // Which WETH/NVDA pool the strategy swaps through. 3000 had the depth when
+        // this was written; by 2026-10-31 the 500 pool held ~2.4x the active
+        // liquidity and quoted 0.2-0.4% more NVDA per WETH. Check before deploying.
+        feeTiers[0] = uint24(vm.envOr("FEE_TIER", uint256(3000)));
 
         vm.startBroadcast(pk);
 
