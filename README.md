@@ -61,6 +61,7 @@ script/Deploy.s.sol            registry + vault/governor pair
 script/DeployStrategyV2.s.sol  the strategy
 script/DeployMainnet.s.sol     all of it in one run, for Robinhood Chain mainnet
 deploy-mainnet.sh, handover.sh the mainnet deploy from a terminal (DEPLOY-MAINNET.md)
+checks.sh                      what both refuse to go on without
 mainnet.env                    its settings, public values only
 addresses/                     one file per chain, written by the deploy
 chains/                        the external contracts each chain's deploy relies on

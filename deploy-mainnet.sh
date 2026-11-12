@@ -11,6 +11,7 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 set -a; source "${ENV_FILE:-./mainnet.env}"; set +a
+source ./checks.sh
 KEYS="${KEYS:-$HOME/.config/recurve}"
 BROADCAST=""; [[ "${1:-}" == "--broadcast" ]] && BROADCAST="--broadcast"
 
@@ -18,9 +19,15 @@ chain=$(cast chain-id --rpc-url "$RPC_URL")
 [[ "$chain" == "4663" ]] || { echo "RPC_URL answers chain $chain, not 4663 (Robinhood Chain mainnet)."; exit 1; }
 [[ -n "${TREASURY:-}" ]] || { echo "Set TREASURY in mainnet.env: the Safe that receives the fees."; exit 1; }
 
-PRIVATE_KEY="$(cat "$KEYS/deployer.key")"; export PRIVATE_KEY
+# The key is handed to forge alone, below, not exported to everything this
+# script starts. cast takes it as an argument, which other processes on this
+# machine can see while it runs: deploy from a machine only you use.
+DEPLOYER_KEY="$(cat "$KEYS/deployer.key")"
 AGENT="$(cat "$KEYS/agent.address")"; export AGENT
-DEPLOYER=$(cast wallet address --private-key "$PRIVATE_KEY")
+is_address "$AGENT" || { echo "$KEYS/agent.address is not an address."; exit 1; }
+DEPLOYER=$(cast wallet address --private-key "$DEPLOYER_KEY")
+check_treasury "$DEPLOYER" "$AGENT"
+export TREASURY
 BAL=$(cast balance "$DEPLOYER" --rpc-url "$RPC_URL")
 echo "deployer  $DEPLOYER  ($(cast from-wei "$BAL") ETH)"
 echo "agent     $AGENT"
@@ -37,7 +44,7 @@ if [[ -n "$BROADCAST" ]]; then
     || { echo "Fund the deployer with at least 0.0004 ETH on Robinhood Chain first."; exit 1; }
 fi
 
-forge script script/DeployMainnet.s.sol --rpc-url "$RPC_URL" $BROADCAST
+PRIVATE_KEY="$DEPLOYER_KEY" forge script script/DeployMainnet.s.sol --rpc-url "$RPC_URL" $BROADCAST
 
 if [[ -z "$BROADCAST" ]]; then
   echo
